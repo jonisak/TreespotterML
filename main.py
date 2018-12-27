@@ -129,7 +129,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--num_epochs', type=int, default=20, help='Number of epochs to train for')
 parser.add_argument('--mode', type=str, default="train", help='Select "train", or "predict" mode. \
     Note that for prediction mode you have to specify an image to run the model on.')
-parser.add_argument('--image', type=str, default="/data/home/jonas/Images/val/Tallstam/IMG_8035.jpg", help='The image you want to predict on. Only valid in "predict" mode.')
+parser.add_argument('--image', type=str, default="/data/home/jonas/Images/test/Tallstam/IMG_0702.jpg", help='The image you want to predict on. Only valid in "predict" mode.')
 parser.add_argument('--continue_training', type=str2bool, default=False, help='Whether to continue training from a checkpoint')
 parser.add_argument('--dataset', type=str, default="Images", help='Dataset you are using.')
 parser.add_argument('--resize_height', type=int, default=224, help='Height of cropped input image to network')
@@ -138,15 +138,15 @@ parser.add_argument('--batch_size', type=int, default=32, help='Number of images
 parser.add_argument('--dropout', type=float, default=1e-3, help='Dropout ratio')
 parser.add_argument('--h_flip', type=str2bool, default=True, help='Whether to randomly flip the image horizontally for data augmentation')
 parser.add_argument('--v_flip', type=str2bool, default=True, help='Whether to randomly flip the image vertically for data augmentation')
-parser.add_argument('--rotation', type=float, default=0.0, help='Whether to randomly rotate the image for data augmentation')
+parser.add_argument('--rotation', type=float, default=20.0, help='Whether to randomly rotate the image for data augmentation')
 parser.add_argument('--zoom', type=float, default=0.0, help='Whether to randomly zoom in for data augmentation')
 parser.add_argument('--shear', type=float, default=0.0, help='Whether to randomly shear in for data augmentation')
 parser.add_argument('--model', type=str, default="VGG19", help='Your pre-trained classification model of choice')
 parser.add_argument('--images_path', type=str, default="/home/jonas/Images/", help="Full path to images dataset")
 parser.add_argument('--include_top', type=str2bool, default=False, help="Include top layers")
-parser.add_argument('--weights', type=str, default=None, help="which pretrained weights (imagenet, none)")#imagenet
-parser.add_argument('--train_from_scratch', type=str2bool, default=True, help="Train model from scratch")
-parser.add_argument('--base_layers_trainable', type=str2bool, default=True, help="Base layers trainable")
+parser.add_argument('--weights', type=str, default="imagenet", help="which pretrained weights (imagenet, none)")#imagenet
+parser.add_argument('--train_from_scratch', type=str2bool, default=False, help="Train model from scratch")
+parser.add_argument('--base_layers_trainable', type=str2bool, default=False, help="Base layers trainable")
 
 args = parser.parse_args()
 
@@ -250,6 +250,7 @@ if args.mode == "train":
 
     # Prepare data generators
     train_datagen =  ImageDataGenerator(
+      rescale = 1./255,
       preprocessing_function=preprocessing_function,
       rotation_range=args.rotation,
       shear_range=args.shear,
@@ -258,11 +259,19 @@ if args.mode == "train":
       vertical_flip=args.v_flip
     )
 
-    val_datagen = ImageDataGenerator(preprocessing_function=preprocessing_function)
+    val_datagen = ImageDataGenerator(rescale = 1./255, preprocessing_function=preprocessing_function)
 
-    train_generator = train_datagen.flow_from_directory(TRAIN_DIR, target_size=(HEIGHT, WIDTH), batch_size=BATCH_SIZE)
+    train_generator = train_datagen.flow_from_directory(
+        TRAIN_DIR, target_size=(HEIGHT, WIDTH), 
+        batch_size=BATCH_SIZE
+        ,class_mode='categorical'
+        )
 
-    validation_generator = val_datagen.flow_from_directory(VAL_DIR, target_size=(HEIGHT, WIDTH), batch_size=BATCH_SIZE)
+    validation_generator = val_datagen.flow_from_directory(
+        VAL_DIR, 
+        target_size=(HEIGHT, WIDTH), 
+        batch_size=BATCH_SIZE,
+        )
 
 
     # Save the list of classes for prediction mode later
@@ -310,12 +319,20 @@ elif args.mode == "predict":
     # Create directories if needed
     if not os.path.isdir("%s"%("Predictions")):
         os.makedirs("%s"%("Predictions"))
+        
+    modell = load_model("./checkpoints/" + args.model + "_model_weights.h5")
 
     # Read in your image
     image = cv2.imread(args.image,-1)
     save_image = image
     image = np.float32(cv2.resize(image, (HEIGHT, WIDTH)))
+    #image = image / 255.0
     image = preprocessing_function(image.reshape(1, HEIGHT, WIDTH, 3))
+
+
+    result = modell.predict(image)
+    print(result)
+
 
     class_list_file = "./checkpoints/" + args.model + "_" + args.dataset + "_class_list.txt"
 

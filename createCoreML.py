@@ -2,7 +2,7 @@ import argparse
 import coremltools
 import keras
 from keras.models import load_model
-
+from PIL import Image  
 
 
 # Command line args
@@ -13,22 +13,19 @@ parser.add_argument('--class_labels', type=str, default="VGG19_Images_class_list
 
 args = parser.parse_args()
 
-scale = 1.0
-
-
+scale = 1./255
 model = load_model(args.filepath + args.model)
-
-
 coreml_model = coremltools.converters.keras.convert(model,
                                                     input_names=['image'],
-                                                    class_labels=args.filepath + "VGG19_Images_class_list.txt",
+                                                    class_labels=args.filepath + args.class_labels, # "VGG16_Images_class_list.txt",
                                                     output_names=['probabilities'],
                                                     image_input_names='image',
                                                     predicted_feature_name='class',
                                                     image_scale=scale,
-                                                    red_bias=0,
-                                                    green_bias=0,
-                                                blue_bias=0
+                                                    red_bias=-1.0,
+                                                    green_bias=-1.0,
+                                                blue_bias=-1.0,
+                                                is_bgr=False
                                                 )
 
 
@@ -36,4 +33,7 @@ coreml_model = coremltools.converters.keras.convert(model,
                                                
 coreml_model.short_description = "Treemodel v0.1"
 coreml_model.save('Tree.mlmodel')
+    
+
+
 
